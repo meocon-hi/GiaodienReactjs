@@ -1,41 +1,6 @@
-// import React from "react"
-// import { Cpu, Users, Shield, Check, MapPin, Phone, Clock } from "lucide-react"
-// import { Button } from "../components/ui/button"
 
-// export default function Homepage() {
-//   const pyramidLevels = [
-//     { percentage: "5%", text: "Là mức độ ghi nhớ khi bạn Được nghe giảng", color: "bg-blue-600" },
-//     { percentage: "10%", text: "Là mức độ ghi nhớ khi bạn Đọc", color: "bg-blue-500" },
-//     { percentage: "20%", text: "Là mức độ ghi nhớ khi bạn Xem video", color: "bg-blue-400" },
-//     { percentage: "30%", text: "Là mức độ ghi nhớ khi bạn Thấy thực tế", color: "bg-teal-500" },
-//     { percentage: "50%", text: "Là mức độ ghi nhớ khi bạn Thảo luận nhóm", color: "bg-teal-400" },
-//     { percentage: "70%", text: "Là mức độ ghi nhớ khi bạn Thực hành", color: "bg-green-500" },
-//     { percentage: "90%", text: "Là mức độ ghi nhớ khi bạn Dạy lại người khác", color: "bg-green-400" },
-//   ]
-
-//   return (
-//     <div className="min-h-screen bg-gray-50">
-   
-//       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-//   <div className="container mx-auto px-4 py-4 flex items-center">
-//     <div className="flex items-center gap-8">
-//       <a href="/" className="flex items-center gap-2">
-//         <img 
-//           src="https://sachso-preview.vercel.app/static/media/sachso_logo.ea7f2393.png" 
-//           className="h-8 w-auto"
-//         />
-//       </a>
-//       <nav className="flex items-center gap-6">
-//       <a href="/" style={{ color: '#1179EF' }} className="text-sm relative top-[5px] hover:text-blue-600 font-medium">Trang chủ</a>
-//       <a href="/gioi-thieu" style={{ color: '#1179EF' }} className="text-sm relative top-[5px] hover:text-blue-600 font-medium">Phương nam</a>
-//       <a href="/dang-nhap" style={{ color: '#1179EF' }} className="text-sm relative top-[5px] hover:text-blue-600 font-medium">Đăng nhập</a>
-//       <a href="/dang-ky" style={{ color: '#1179EF' }} className="text-sm relative top-[5px] hover:text-blue-600 font-medium">Đăng ký học sinh</a>
-//     </nav>
-//     </div>
-//   </div>
-// </header>
 import React, { useState } from "react"
-import { Cpu, Users, Shield, Check, MapPin, Phone, Clock } from "lucide-react"
+import { Cpu, Users, Shield, Check, MapPin, Phone, Clock, Edit, Eye, Trash2 } from "lucide-react"
 import { Button } from "../components/ui/button"
 
 export default function Homepage() {
