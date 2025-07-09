@@ -5,7 +5,9 @@ interface ButtonProps {
   variant?: 'default' | 'outline';
   size?: 'default' | 'lg';
   className?: string;
-  onClick?: () => void;
+  onClick?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
+  disabled?: boolean;
+  type?: 'button' | 'submit' | 'reset';
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -14,6 +16,8 @@ export const Button: React.FC<ButtonProps> = ({
   size = 'default',
   className = '',
   onClick,
+  disabled = false,
+  type = 'button',
 }) => {
   const baseClasses = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
   
@@ -30,7 +34,7 @@ export const Button: React.FC<ButtonProps> = ({
   const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
 
   return (
-    <button className={classes} onClick={onClick}>
+    <button className={classes} onClick={onClick} disabled={disabled} type={type}>
       {children}
     </button>
   );
