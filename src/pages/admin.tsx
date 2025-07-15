@@ -26,6 +26,11 @@ import {
 } from "lucide-react"
 import * as XLSX from "xlsx";
 // import UserFormModal from "./user-form-modal"
+// 1. Thêm import cho Ant Design và mathjax-react
+import { Table as AntTable, Button as AntButton, Modal, Form, Input as AntInput, Select as AntSelect } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { MathJax, MathJaxContext } from "better-react-mathjax";
+import QuestionManager from './QuestionManager';
 
 interface ApiUser {
   id: number
@@ -166,6 +171,38 @@ export default function Component() {
   const [deleteError, setDeleteError] = useState('')
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{success: number, fail: number}>({success: 0, fail: 0});
+
+  // 2. Thêm state để chuyển tab admin (user/question)
+  const [adminTab, setAdminTab] = useState<'user' | 'question'>('user');
+
+  // 5. Thêm state và logic cho quản lý câu hỏi Multiple Choice
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<any>(null);
+  const [questionForm] = Form.useForm();
+  // Sửa lại columns cho bảng câu hỏi
+  const questionColumns = [
+    { title: 'Nội dung', dataIndex: 'content', key: 'content', render: (text: string) => (
+      <MathJaxContext>
+        <MathJax inline dynamic>{text}</MathJax>
+      </MathJaxContext>
+    ) },
+    { title: 'A', dataIndex: 'A', key: 'A' },
+    { title: 'B', dataIndex: 'B', key: 'B' },
+    { title: 'C', dataIndex: 'C', key: 'C' },
+    { title: 'D', dataIndex: 'D', key: 'D' },
+    { title: 'Đáp án đúng', dataIndex: 'correct', key: 'correct' },
+    {
+      title: 'Hành động',
+      key: 'action',
+      render: (_: any, record: any) => (
+        <>
+          <AntButton icon={<EditOutlined />} onClick={() => handleEditQuestion(record)} style={{ marginRight: 8 }} />
+          <AntButton icon={<DeleteOutlined />} danger onClick={() => handleDeleteQuestion(record.id)} />
+        </>
+      )
+    }
+  ];
 
   // Helper function để lấy giá trị cột với tên đã được trim
   const getColumnValue = (row: any, columnName: string): string => {
@@ -498,6 +535,28 @@ export default function Component() {
     setImporting(false);
   };
 
+  // 5. Thêm state và logic cho quản lý câu hỏi Multiple Choice
+  function handleQuestionSubmit() {
+    questionForm.validateFields().then(values => {
+      if (editingQuestion) {
+        setQuestions(qs => qs.map(q => q.id === editingQuestion.id ? { ...editingQuestion, ...values } : q));
+      } else {
+        setQuestions(qs => [...qs, { ...values, id: Date.now() }]);
+      }
+      setShowAddQuestionModal(false);
+      setEditingQuestion(null);
+      questionForm.resetFields();
+    });
+  }
+  function handleEditQuestion(q: any) {
+    setEditingQuestion(q);
+    setShowAddQuestionModal(true);
+    questionForm.setFieldsValue(q);
+  }
+  function handleDeleteQuestion(id: any) {
+    setQuestions(qs => qs.filter(q => q.id !== id));
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen bg-gradient-to-br from-blue-50 to-white items-center justify-center">
@@ -528,6 +587,10 @@ export default function Component() {
               <div
                 key={i}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg mb-1 cursor-pointer hover:bg-blue-50 ${item.active ? "bg-blue-100 text-blue-600" : "text-gray-600"}`}
+                onClick={() => {
+                  if (item.label === 'Quản lý người dùng') setAdminTab('user');
+                  if (item.label === 'Quản lý câu hỏi') setAdminTab('question');
+                }}
               >
                 <item.icon className="w-5 h-5" />
                 {sidebarOpen && <span className="text-sm">{item.label}</span>}
@@ -566,234 +629,238 @@ export default function Component() {
         </div>
 
         <div className="flex-1 p-6">
-          <div className="bg-white rounded-2xl shadow-md">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold text-gray-800">QUẢN LÝ NGƯỜI DÙNG</h2>
-              <div className="flex gap-2">
-                <Button onClick={() => setShowAddModal(true)} className="bg-gradient-to-r from-green-400 to-green-600 hover:opacity-90 text-white rounded-xl shadow">
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Thêm người dùng
-                </Button>
-                <label className="rounded-xl shadow cursor-pointer inline-flex items-center px-4 py-2 bg-white border border-blue-600 text-blue-600 hover:bg-blue-50">
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  Nhập từ excel
-                  <input type="file" accept=".xlsx,.xls" onChange={handleImportExcel} style={{display: "none"}} />
-                </label>
-              </div>
-            </div>
-            {importing && <div className="p-4 text-blue-600">Đang nhập dữ liệu từ Excel...</div>}
-            {(importResult.success > 0 || importResult.fail > 0) && (
-              <div className="p-4 text-green-700">Thành công: {importResult.success} | Thất bại: <span className="text-red-600">{importResult.fail}</span></div>
-            )}
-
-            {/* Modal cập nhật user */}
-            {showEditModal && editUser && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
-                  <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowEditModal(false)}>&times;</button>
-                  <h2 className="text-xl font-bold mb-4">Cập nhật người dùng</h2>
-                  <form onSubmit={handleEditUserSubmit} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Tên</label>
-                      <Input type="text" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} required />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Email</label>
-                      <Input type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} required />
-                    </div>
-                    {updateError && <div className="text-red-500 text-sm">{updateError}</div>}
-                    {updateSuccess && <div className="text-green-600 text-sm">{updateSuccess}</div>}
-                    <div className="flex gap-2 pt-2">
-                      <Button type="submit" className="flex-1 bg-blue-600 text-white" disabled={updating}>
-                        <Edit className="w-4 h-4 mr-2" />
-                        {updating ? 'Đang cập nhật...' : 'Cập nhật'}
-                      </Button>
-                      <Button type="button" className="flex-1" onClick={() => setShowEditModal(false)}>Hủy</Button>
-                    </div>
-                  </form>
+          {adminTab === 'user' && (
+            <div className="bg-white rounded-2xl shadow-md">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h2 className="text-lg font-semibold text-gray-800">QUẢN LÝ NGƯỜI DÙNG</h2>
+                <div className="flex gap-2">
+                  <Button onClick={() => setShowAddModal(true)} className="bg-gradient-to-r from-green-400 to-green-600 hover:opacity-90 text-white rounded-xl shadow">
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Thêm người dùng
+                  </Button>
+                  <label className="rounded-xl shadow cursor-pointer inline-flex items-center px-4 py-2 bg-white border border-blue-600 text-blue-600 hover:bg-blue-50">
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Nhập từ excel
+                    <input type="file" accept=".xlsx,.xls" onChange={handleImportExcel} style={{display: "none"}} />
+                  </label>
                 </div>
               </div>
-            )}
+              {importing && <div className="p-4 text-blue-600">Đang nhập dữ liệu từ Excel...</div>}
+              {(importResult.success > 0 || importResult.fail > 0) && (
+                <div className="p-4 text-green-700">Thành công: {importResult.success} | Thất bại: <span className="text-red-600">{importResult.fail}</span></div>
+              )}
 
-            {/* Modal thêm user */}
-            {showAddModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
-                  <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowAddModal(false)}>&times;</button>
-                  <h2 className="text-xl font-bold mb-4">Thêm người dùng mới</h2>
-                  <form onSubmit={handleAddUserSubmit} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Tên</label>
-                      <Input type="text" value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} required />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Email</label>
-                      <Input type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} required />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Mật khẩu</label>
-                      <Input type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} required />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Avatar (URL)</label>
-                      <Input type="text" value={newUser.avatar} onChange={e => setNewUser({ ...newUser, avatar: e.target.value })} />
-                    </div>
-                    {addError && <div className="text-red-500 text-sm">{addError}</div>}
-                    {addSuccess && <div className="text-green-600 text-sm">{addSuccess}</div>}
-                    <div className="flex gap-2 pt-2">
-                      <Button type="submit" className="flex-1 bg-blue-600 text-white" disabled={adding}>{adding ? 'Đang thêm...' : 'Thêm'}</Button>
-                      <Button type="button" className="flex-1" onClick={() => setShowAddModal(false)}>Hủy</Button>
-                    </div>
-                  </form>
+              {/* Modal cập nhật user */}
+              {showEditModal && editUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                  <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
+                    <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowEditModal(false)}>&times;</button>
+                    <h2 className="text-xl font-bold mb-4">Cập nhật người dùng</h2>
+                    <form onSubmit={handleEditUserSubmit} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Tên</label>
+                        <Input type="text" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} required />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Email</label>
+                        <Input type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} required />
+                      </div>
+                      {updateError && <div className="text-red-500 text-sm">{updateError}</div>}
+                      {updateSuccess && <div className="text-green-600 text-sm">{updateSuccess}</div>}
+                      <div className="flex gap-2 pt-2">
+                        <Button type="submit" className="flex-1 bg-blue-600 text-white" disabled={updating}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          {updating ? 'Đang cập nhật...' : 'Cập nhật'}
+                        </Button>
+                        <Button type="button" className="flex-1" onClick={() => setShowEditModal(false)}>Hủy</Button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Modal xác nhận xóa */}
-            {showDeleteModal && deletingUser && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
-                  <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowDeleteModal(false)}>&times;</button>
-                  <h2 className="text-xl font-bold mb-4 text-red-600">Xác nhận xóa</h2>
-                  <p className="mb-4">Bạn có chắc muốn xóa người dùng <span className="font-semibold">{deletingUser.name}</span> không?</p>
-                  {deleteError && <div className="text-red-500 text-sm mb-2">{deleteError}</div>}
-                  <div className="flex gap-2 pt-2">
-                    <Button onClick={handleDeleteUser} className="flex-1 bg-red-600 text-white" disabled={deleting}>{deleting ? 'Đang xóa...' : 'Xóa'}</Button>
-                    <Button type="button" className="flex-1" onClick={() => setShowDeleteModal(false)}>Hủy</Button>
+              {/* Modal thêm user */}
+              {showAddModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                  <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
+                    <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowAddModal(false)}>&times;</button>
+                    <h2 className="text-xl font-bold mb-4">Thêm người dùng mới</h2>
+                    <form onSubmit={handleAddUserSubmit} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Tên</label>
+                        <Input type="text" value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} required />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Email</label>
+                        <Input type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} required />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Mật khẩu</label>
+                        <Input type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} required />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Avatar (URL)</label>
+                        <Input type="text" value={newUser.avatar} onChange={e => setNewUser({ ...newUser, avatar: e.target.value })} />
+                      </div>
+                      {addError && <div className="text-red-500 text-sm">{addError}</div>}
+                      {addSuccess && <div className="text-green-600 text-sm">{addSuccess}</div>}
+                      <div className="flex gap-2 pt-2">
+                        <Button type="submit" className="flex-1 bg-blue-600 text-white" disabled={adding}>{adding ? 'Đang thêm...' : 'Thêm'}</Button>
+                        <Button type="button" className="flex-1" onClick={() => setShowAddModal(false)}>Hủy</Button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal xác nhận xóa */}
+              {showDeleteModal && deletingUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                  <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
+                    <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowDeleteModal(false)}>&times;</button>
+                    <h2 className="text-xl font-bold mb-4 text-red-600">Xác nhận xóa</h2>
+                    <p className="mb-4">Bạn có chắc muốn xóa người dùng <span className="font-semibold">{deletingUser.name}</span> không?</p>
+                    {deleteError && <div className="text-red-500 text-sm mb-2">{deleteError}</div>}
+                    <div className="flex gap-2 pt-2">
+                      <Button onClick={handleDeleteUser} className="flex-1 bg-red-600 text-white" disabled={deleting}>{deleting ? 'Đang xóa...' : 'Xóa'}</Button>
+                      <Button type="button" className="flex-1" onClick={() => setShowDeleteModal(false)}>Hủy</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="p-4 border-b">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Loại tài khoản:</label>
+                    <Select value={filterType} onChange={e => setFilterType(e.target.value)}>
+                      <option value="all">Tất cả</option>
+                      <option value="Học sinh">Học sinh</option>
+                      <option value="Giáo viên">Giáo viên</option>
+                      <option value="Admin">Admin</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cấp:</label>
+                    <Select value={filterLevel} onChange={e => setFilterLevel(e.target.value)}>
+                      <option value="all">Tất cả</option>
+                      <option value="Cấp 1">Cấp 1</option>
+                      <option value="Cấp 2">Cấp 2</option>
+                      <option value="Cấp 3">Cấp 3</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email hoặc ID:</label>
+                    <Input value={filterEmail} onChange={e => setFilterEmail(e.target.value)} placeholder="Nhập email hoặc ID..." />
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={handleSearch} className="bg-blue-500 hover:bg-blue-600 text-white w-full rounded-xl shadow" disabled={searching}>
+                      <Search className="w-4 h-4 mr-2" />
+                      {searching ? 'Đang tìm...' : 'Tìm kiếm'}
+                    </Button>
                   </div>
                 </div>
               </div>
-            )}
 
-            <div className="p-4 border-b">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Loại tài khoản:</label>
-                  <Select value={filterType} onChange={e => setFilterType(e.target.value)}>
-                    <option value="all">Tất cả</option>
-                    <option value="Học sinh">Học sinh</option>
-                    <option value="Giáo viên">Giáo viên</option>
-                    <option value="Admin">Admin</option>
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cấp:</label>
-                  <Select value={filterLevel} onChange={e => setFilterLevel(e.target.value)}>
-                    <option value="all">Tất cả</option>
-                    <option value="Cấp 1">Cấp 1</option>
-                    <option value="Cấp 2">Cấp 2</option>
-                    <option value="Cấp 3">Cấp 3</option>
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email hoặc ID:</label>
-                  <Input value={filterEmail} onChange={e => setFilterEmail(e.target.value)} placeholder="Nhập email hoặc ID..." />
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={handleSearch} className="bg-blue-500 hover:bg-blue-600 text-white w-full rounded-xl shadow" disabled={searching}>
-                    <Search className="w-4 h-4 mr-2" />
-                    {searching ? 'Đang tìm...' : 'Tìm kiếm'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Mã</TableHead>
-                    <TableHead>Họ và tên</TableHead>
-                    <TableHead>Loại tài khoản</TableHead>
-                    <TableHead>Cấp</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Số điện thoại</TableHead>
-                    <TableHead>Ngày tạo</TableHead>
-                    <TableHead className="w-32">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {currentUsers.map((user, index) => (
-                    <TableRow key={user.id} className="hover:bg-blue-50">
-                      <TableCell>{startIndex + index + 1}</TableCell>
-                      <TableCell className="font-medium">{user.id}</TableCell>
-                      <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell>
-                        <Badge className="bg-blue-100 text-blue-800">
-                          {user.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`rounded-full px-2 text-sm ${user.level === "Cấp 1" ? "border-green-500 text-green-700" : user.level === "Cấp 2" ? "border-orange-500 text-orange-700" : "border-red-500 text-red-700"}`}>{user.level}</Badge>
-                      </TableCell>
-                      <TableCell className="text-blue-600">{user.email}</TableCell>
-                      <TableCell className="text-gray-600">{user.phone}</TableCell>
-                      <TableCell className="text-sm text-gray-500">{user.date}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="outline" className="h-8 w-8 p-0 flex items-center justify-center" onClick={() => handleOpenEditModal(user)}>
-                            <Edit className="w-4 h-4" />✏️
-                          </Button>
-                          <Button variant="outline" className="h-8 w-8 p-0 flex items-center justify-center">
-                            <Eye className="w-4 h-4" />🔍
-                          </Button>
-                          <Button variant="outline" className="h-8 w-8 p-0 flex items-center justify-center text-red-600 hover:text-red-700" onClick={() => handleOpenDeleteModal(user)}>
-                            <Trash2 className="w-4 h-4" />🗑️
-                          </Button>
-                        </div>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Mã</TableHead>
+                      <TableHead>Họ và tên</TableHead>
+                      <TableHead>Loại tài khoản</TableHead>
+                      <TableHead>Cấp</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Số điện thoại</TableHead>
+                      <TableHead>Ngày tạo</TableHead>
+                      <TableHead className="w-32">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {currentUsers.map((user, index) => (
+                      <TableRow key={user.id} className="hover:bg-blue-50">
+                        <TableCell>{startIndex + index + 1}</TableCell>
+                        <TableCell className="font-medium">{user.id}</TableCell>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>
+                          <Badge className="bg-blue-100 text-blue-800">
+                            {user.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`rounded-full px-2 text-sm ${user.level === "Cấp 1" ? "border-green-500 text-green-700" : user.level === "Cấp 2" ? "border-orange-500 text-orange-700" : "border-red-500 text-red-700"}`}>{user.level}</Badge>
+                        </TableCell>
+                        <TableCell className="text-blue-600">{user.email}</TableCell>
+                        <TableCell className="text-gray-600">{user.phone}</TableCell>
+                        <TableCell className="text-sm text-gray-500">{user.date}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="outline" className="h-8 w-8 p-0 flex items-center justify-center" onClick={() => handleOpenEditModal(user)}>
+                              <Edit className="w-4 h-4" />✏️
+                            </Button>
+                            <Button variant="outline" className="h-8 w-8 p-0 flex items-center justify-center">
+                              <Eye className="w-4 h-4" />🔍
+                            </Button>
+                            <Button variant="outline" className="h-8 w-8 p-0 flex items-center justify-center text-red-600 hover:text-red-700" onClick={() => handleOpenDeleteModal(user)}>
+                              <Trash2 className="w-4 h-4" />🗑️
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
-            <div className="flex items-center justify-between p-4 border-t">
-              <div className="flex items-center gap-2">
-                <Button 
-                  onClick={() => handlePageChange(currentPage - 1)} 
-                  disabled={currentPage === 1}
-                  className="rounded-lg shadow-sm hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                
-                {getPageNumbers().map((num) => (
+              <div className="flex items-center justify-between p-4 border-t">
+                <div className="flex items-center gap-2">
                   <Button 
-                    key={num} 
-                    onClick={() => handlePageChange(num)}
-                    className={`rounded-lg shadow-sm ${num === currentPage ? "bg-blue-500 text-white" : "hover:bg-blue-50"}`}
+                    onClick={() => handlePageChange(currentPage - 1)} 
+                    disabled={currentPage === 1}
+                    className="rounded-lg shadow-sm hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {num}
+                    <ChevronLeft className="w-4 h-4" />
                   </Button>
-                ))}
-                
-                {totalPages > 5 && currentPage < totalPages - 2 && (
-                  <>
-                    <span className="text-sm text-gray-500">...</span>
+                  
+                  {getPageNumbers().map((num) => (
                     <Button 
-                      onClick={() => handlePageChange(totalPages)}
-                      className="rounded-lg shadow-sm hover:bg-blue-50"
+                      key={num} 
+                      onClick={() => handlePageChange(num)}
+                      className={`rounded-lg shadow-sm ${num === currentPage ? "bg-blue-500 text-white" : "hover:bg-blue-50"}`}
                     >
-                      {totalPages}
+                      {num}
                     </Button>
-                  </>
-                )}
-                
-                <Button 
-                  onClick={() => handlePageChange(currentPage + 1)} 
-                  disabled={currentPage === totalPages}
-                  className="rounded-lg shadow-sm hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="text-sm text-gray-500">
-                Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredUsers.length)} trong tổng số {filteredUsers.length} người dùng
+                  ))}
+                  
+                  {totalPages > 5 && currentPage < totalPages - 2 && (
+                    <>
+                      <span className="text-sm text-gray-500">...</span>
+                      <Button 
+                        onClick={() => handlePageChange(totalPages)}
+                        className="rounded-lg shadow-sm hover:bg-blue-50"
+                      >
+                        {totalPages}
+                      </Button>
+                    </>
+                  )}
+                  
+                  <Button 
+                    onClick={() => handlePageChange(currentPage + 1)} 
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg shadow-sm hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="text-sm text-gray-500">
+                  Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredUsers.length)} trong tổng số {filteredUsers.length} người dùng
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {adminTab === 'question' && <QuestionManager />}
         </div>
       </div>
 
